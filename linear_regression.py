@@ -1,109 +1,120 @@
-from typing import Annotated
-import pandas as pd
 import numpy as np
-from threading import Thread
-        
+import pandas as pd
+from scipy.stats import zscore
 
 class Linear_regression:
-
-    b=1
-    w=1
-    alpha=0.01
-    iteration_rate=10000
-    w_vector=None
-    w_derivative_vector=None
+    b=0
+    w=None
+    w_init=0
+    alpha=1e-3
+    iteration_rate=1000
+    record_cost_history=False
+    cost_history=[]
 
     def __init__(self,**keywords):
-        self.data=keywords["data"]
-        
-        self.response_feature=keywords["response"]
 
+        predictor_features=keywords["predictors"]
+        data=keywords["data"]
+        self.m=data.shape[0]
+        self.predictor_data=data[predictor_features]
+        self.response_data=data[keywords["response"]]
+    
         if "b_init" in keywords:
             self.b=keywords["b_init"]
 
         if "w_init" in keywords:
-            self.w=keywords["w_init"]
+            self.w_init=keywords["w_init"]
 
         if "alpha" in keywords:
             self.alpha=keywords["alpha"]
             
         if "iteration_rate" in keywords:
             self.iteration_rate=keywords["iteration_rate"]
+            
+        if "w_derivation_function" in keywords:
+            self.w_derivation_function=keywords["w_derivation_function"]
+            
+        if "b_derivation_function" in keywords:
+            self.b_derivation_function=keywords["b_derivation_function"]
+            
+        if "record_cost_history" in keywords:
+            self.record_cost_history=keywords["record_cost_history"]
 
-        if len(keywords["predictors"])==1: # single variable prediction
-            self.prediction_type="single variable"
-            self.predict_feature=keywords["predictors"][0]
-        else :
-            self.prediction_type="multi variable"
-            self.predict_features=keywords["predictors"]
-
-    def gradient_descent(self):
-        if self.prediction_type=="single variable":
-            return self.single_variable_gradient_descent()
-        else:
-            return self.multi_variable_gradient_descent()
-
-    def cost_calculator(self):
-        costs=[]
-        m=self.data.shape[0]
-
-        for index in self.data.index:
-            x=self.data[self.predict_feature][index]
-            y=self.data[self.response_feature][index]
-
-            f_x= ( self.w * x ) + self.b
-            cost= ( f_x - y ) **2
-            costs.append(cost)
+        self.w=np.full(self.predictor_data.shape[1],self.w_init)
         
-        costs=np.array(costs)
-        costs=np.sum(costs)
-        costs= costs / ( 2 * m )
-        return costs
+        
     
-    def gradient_calculator(self):
-        dj_dw_array=[]
+    def f_x(self,data_index):
+
+        x=self.predictor_data.iloc[data_index]
+
+        result=np.dot(self.w,x)
+
+        result = result + self.b
+
+        return result
+
+    def cost_function(self):
+        f_x=[]
+        for index in self.predictor_data.index:
+            f_x_i=self.f_x(index)
+            y_i=self.response_data[index]
+            cost= (f_x_i - y_i)**2
+            f_x.append(cost)
+
+        f_x=np.array(f_x)
+        f_x=np.sum(f_x)
+        return f_x
+    
+    def w_gradient_calculator(self):
+        self.w_gradients=np.full(self.predictor_data.shape[1],float(1))
+
+        predictor_number=0
+
+        for predictor in self.predictor_data.columns:
+
+            dj_dw_array=[]
+
+            for index in self.predictor_data.index:
+
+                f_x_i=self.f_x(index)
+                y_i=self.response_data[index]
+                x_i_n=self.predictor_data[predictor][index]
+
+                dj_dw= ( f_x_i - y_i ) * x_i_n
+                dj_dw_array.append(dj_dw)
+            
+            dj_dw_array=np.array(dj_dw_array)
+            dj_dw=np.sum(dj_dw_array)
+            dj_dw=dj_dw / self.m
+            dj_dw=dj_dw * self.alpha
+
+            self.w_gradients[predictor_number]=dj_dw
+            predictor_number=predictor_number+1
+
+    def b_gradient_calculator(self):
         dj_db_array=[]
-        m=self.data.shape[0]
-    
-        for index in self.data.index :
-        
-            x=self.data[self.predict_feature][index]
-            y=self.data[self.response_feature][index]
-        
-            f_x=( self.w * x ) + self.b
 
-            dj_dw= ( f_x - y ) * x
-            dj_db= f_x - y
-
-            dj_dw_array.append(dj_dw)
+        for index in self.predictor_data.index:
+            f_x_i=self.f_x(index)
+            y_i=self.response_data[index]
+            dj_db= f_x_i - y_i 
             dj_db_array.append(dj_db)
         
-        dj_dw=np.array(dj_dw_array)
-        dj_dw=np.sum(dj_dw_array)
-        dj_dw=dj_dw / m
-        
-        dj_db=np.array(dj_db_array)
+        dj_db_array=np.array(dj_db_array)
         dj_db=np.sum(dj_db_array)
-        dj_db=dj_db / m
-    
-        return dj_dw,dj_db
-    
-    def single_variable_gradient_descent(self):
-    
-        cost_history=[]
+        dj_db=dj_db / self.m
+        dj_db=dj_db * self.alpha
+        self.b=self.b - dj_db
 
-        print(self.alpha)
-    
-        for i in range(self.iteration_rate):
+    def gradient_descent(self):
 
-            cost = self.cost_calculator()
-        
-            cost_history.append(cost)
+        self.cost_history=[]
 
-            dj_dw , dj_db = self.gradient_calculator()
-    
-            self.w= self.w - ( self.alpha * dj_dw )
-    
-            self.b= self.b - ( self.alpha * dj_db )
+        for k in range(self.iteration_rate):
+            self.w_gradient_calculator()
+            self.b_gradient_calculator()
+            self.w=np.subtract(self.w,self.w_gradients)
 
-        return cost_history
+            if self.record_cost_history:
+                self.cost_history.append(self.cost_function())
