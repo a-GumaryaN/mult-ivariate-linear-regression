@@ -10,6 +10,7 @@ class Linear_regression:
     iteration_rate=1000
     record_cost_history=False
     cost_history=[]
+    landa=0
 
     def __init__(self,**keywords):
 
@@ -39,6 +40,9 @@ class Linear_regression:
             
         if "record_cost_history" in keywords:
             self.record_cost_history=keywords["record_cost_history"]
+            
+        if "landa" in keywords:
+            self.landa=keywords["landa"]
 
         self.w=np.full(self.predictor_data.shape[1],self.w_init)
         
@@ -71,6 +75,10 @@ class Linear_regression:
 
         predictor_number=0
 
+        m=self.predictor_data.shape[0]
+
+        predictor_index=0
+
         for predictor in self.predictor_data.columns:
 
             dj_dw_array=[]
@@ -87,10 +95,12 @@ class Linear_regression:
             dj_dw_array=np.array(dj_dw_array)
             dj_dw=np.sum(dj_dw_array)
             dj_dw=dj_dw / self.m
+            dj_dw= dj_dw + ( ( self.landa / m ) * self.w[predictor_index] )
             dj_dw=dj_dw * self.alpha
 
             self.w_gradients[predictor_number]=dj_dw
             predictor_number=predictor_number+1
+            predictor_index=predictor_index+1
 
     def b_gradient_calculator(self):
         dj_db_array=[]

@@ -42,7 +42,7 @@ else :
     data=pd.read_csv("./data/cleaned_data.csv")
 
 
-regg=Linear_regression(alpha=1e-6,data=data,predictors=["A","B","C"],response="R",iteration_rate=2000)
+regg=Linear_regression(landa=1e3,alpha=1e-6,data=data,predictors=["A","B","C"],response="R",iteration_rate=2000)
 regg.gradient_descent()
 
 print(regg.w)
